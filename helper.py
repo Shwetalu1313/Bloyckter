@@ -75,3 +75,8 @@ def save_data(data):
     with open (DATA_FILE, "wb") as f:
         f.write(encrypted)
 
+# ======================================
+# hash the password
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
