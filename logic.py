@@ -70,6 +70,11 @@ def unlock_folder(folder_path: str, password: str):
 
     return False, "Wrong Password"
 
+# managed folders
+def get_managed_folders():
+    data = load_data()
+    return list(data.keys())
+
 
     
 
