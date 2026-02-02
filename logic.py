@@ -46,7 +46,9 @@ def unlock_folder(folder_path: str, password: str):
     if folder_path not in data:
         return False, "Folder not managed"
     
-    info = FolderLock(**data[folder_path])
+    raw = data[folder_path].copy()
+    raw.pop("path", None)
+    info = FolderLock(path=folder_path, **raw)
 
     if info.is_locked_out():
         return False, f"Wait {info.remaining_wait()} seconds."
@@ -67,13 +69,22 @@ def unlock_folder(folder_path: str, password: str):
 
     info.attempts += 1
 
+    # Last Attempts -> Lock out
     if info.attempts >= info.max_attempts:
         info.locked_until = time.time() + info.wait_time
         info.attempts = 0
 
+        data[folder_path] = info.__dict__
+        save_data(data)
+
+        return False, (
+        f"Too many wrong attempts.\n"
+        f"Locked for {info.wait_time} seconds."
+    )
+
+    # Normal Wrong Attempts
     data[folder_path] = info.__dict__
     save_data(data)
-
     remaining = info.max_attempts - info.attempts
     return False, f"Wrong password. Attempts left: {remaining}"
 

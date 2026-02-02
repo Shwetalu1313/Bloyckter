@@ -200,3 +200,6 @@ tree.tag_configure("normal", background="#ffffff")  # white
 # initial refresh
 refresh_table()
 update_time_column()
+
+# START THE GUI EVENT LOOP  
+root.mainloop()

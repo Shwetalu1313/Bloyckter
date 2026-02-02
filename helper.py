@@ -1,82 +1,263 @@
-import json
-import os
-import hashlib
-from cryptography.fernet import Fernet
+"""
+helper.py
+==========
 
-DATA_FILE = "data.enc"
-KEY_FILE = "secret.key"
+This module is responsible for:
+- Secure key storage (Windows DPAPI)
+- Encrypted data storage (Fernet / AES)
+- File system location management (AppData)
+- Password hashing
+- Permission hardening
 
-# loading key
-def load_key(): 
+IMPORTANT DESIGN RULE:
+This file contains NO GUI logic and NO business logic.
+It only provides reusable helper utilities.
+"""
 
-    # if path is not exist, generate key
+# =========================
+# Standard library imports
+# =========================
+import os          # File paths, environment variables
+import json        # Serialize / deserialize data
+import hashlib     # Password hashing (SHA-256)
+import subprocess  # Run Windows commands (icacls)
+
+# =========================
+# Third-party libraries
+# =========================
+from cryptography.fernet import Fernet  # Symmetric encryption (AES)
+import win32crypt                      # Windows DPAPI (key protection)
+
+# ======================================================
+# Application identity (used for AppData folder name)
+# ======================================================
+APP_NAME = "Bloyckter"
+
+# ======================================================
+# AppData directory handling
+# ======================================================
+def get_app_data_dir():
+    """
+    Returns a secure, per-user application data directory.
+
+    On Windows this resolves to:
+    C:\\Users\\<USERNAME>\\AppData\\Local\\Bloyckter\\
+
+    Why AppData?
+    - Hidden by default
+    - Per-user isolation
+    - Standard Windows practice
+    - Used by Chrome, VS Code, Edge, etc.
+    """
+
+    # LOCALAPPDATA is preferred (Local, non-roaming)
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+
+    # Construct app-specific directory
+    app_dir = os.path.join(base, APP_NAME)
+
+    # Ensure directory exists
+    os.makedirs(app_dir, exist_ok=True)
+
+    return app_dir
+
+
+# ======================================================
+# File paths (centralized, single source of truth)
+# ======================================================
+APP_DATA_DIR = get_app_data_dir()
+
+# Encrypted application data
+DATA_FILE = os.path.join(APP_DATA_DIR, "data.enc")
+
+# DPAPI-protected encryption key
+KEY_FILE = os.path.join(APP_DATA_DIR, "key.blob")
+
+
+# ======================================================
+# NTFS permission hardening
+# ======================================================
+def restrict_permission(path: str):
+    """
+    Restrict file permissions so ONLY the current Windows user
+    can access the file.
+
+    This uses the Windows `icacls` command.
+
+    Result:
+    - Removes inherited permissions
+    - Grants Full Control ONLY to current user
+    - Other local users are denied access
+
+    NOTE:
+    - Admin users can still override (this is normal)
+    - This raises the bar significantly for casual attacks
+    """
+
+    subprocess.run(
+        f'icacls "{path}" /inheritance:r /grant:r %username%:F',
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+
+
+# ======================================================
+# DPAPI key management
+# ======================================================
+def load_key():
+    """
+    Loads or creates an AES encryption key protected by Windows DPAPI.
+
+    SECURITY MODEL:
+    - Key is NEVER stored in plaintext
+    - Key is encrypted by Windows itself
+    - Key is bound to:
+        - Current Windows user
+        - Current machine
+
+    If files are copied elsewhere → decryption FAILS safely.
+    """
+
+    # --------------------------------------------------
+    # First run: key does NOT exist
+    # --------------------------------------------------
     if not os.path.exists(KEY_FILE):
+
+        # Generate a new Fernet (AES) key
         key = Fernet.generate_key()
 
-        # open file and write in the binary format
+        # Protect the key using Windows DPAPI
+        # Only this user on this machine can unprotect it
+        protected = win32crypt.CryptProtectData(
+            key,     # raw key bytes
+            None,    # optional description
+            None,    # optional entropy
+            None,    # reserved
+            None,    # prompt structure
+            0        # flags
+        )
+
+        # Save protected key to disk
         with open(KEY_FILE, "wb") as f:
+            f.write(protected)
 
-            # create new key
-            f.write(key)
+        # Lock down file permissions
+        restrict_permission(KEY_FILE)
 
-    else:
+        return key
 
-        # open file and read in the binary format
-        with open(KEY_FILE, "rb") as f:
+    # --------------------------------------------------
+    # Key already exists → load & unprotect
+    # --------------------------------------------------
+    with open(KEY_FILE, "rb") as f:
+        protected = f.read()
 
-            # read the key
-            key = f.read()
+    # Unprotect key using Windows DPAPI
+    key = win32crypt.CryptUnprotectData(
+        protected,
+        None,
+        None,
+        None,
+        None,
+        0
+    )[1]
 
-    # finally return the key
     return key
 
-# =======================================
 
-# create a ciper object
+# ======================================================
+# Cipher creation (single responsibility)
+# ======================================================
 def get_cipher():
+    """
+    Returns a Fernet cipher object initialized with
+    the DPAPI-protected AES key.
+
+    This function hides ALL key-management details
+    from the rest of the application.
+    """
     return Fernet(load_key())
 
-# ========================================
 
-# data loading
+# ======================================================
+# Encrypted data loading
+# ======================================================
 def load_data():
-    # if file is not exists, return path
+    """
+    Loads and decrypts application data from disk.
+
+    Behavior:
+    - If file does not exist → return empty dict
+    - If file is corrupted / key missing → fail safely
+      by returning empty dict
+
+    IMPORTANT:
+    - This prevents crashes
+    - Data loss is safer than data exposure
+    """
+
     if not os.path.exists(DATA_FILE):
         return {}
-    
-    # ciper object
+
+    try:
+        cipher = get_cipher()
+
+        with open(DATA_FILE, "rb") as f:
+            encrypted = f.read()
+
+        decrypted = cipher.decrypt(encrypted)
+        return json.loads(decrypted.decode())
+
+    except Exception:
+        # Any error = treat as empty data
+        # (wrong key, tampered file, corrupted file)
+        return {}
+
+
+# ======================================================
+# Encrypted data saving
+# ======================================================
+def save_data(data: dict):
+    """
+    Encrypts and saves application data to disk.
+
+    Steps:
+    1. Convert dict → JSON
+    2. Encrypt JSON using Fernet (AES)
+    3. Write encrypted bytes to disk
+    4. Restrict file permissions
+    """
+
     cipher = get_cipher()
 
-    # open and read the file in binary format
-    with open(DATA_FILE, "rb") as f:
-        encrypted = f.read()
-
-    # decrypted the reading in binary format
-    decrypted = cipher.decrypt(encrypted)
-
-    # decode in the json format
-    return json.loads(decrypted.decode())
-
-# ======================================
-
-# save in encrypted data
-def save_data(data):
-
-    # ciper object
-    ciper = get_cipher()
-
-    # string to bytes
+    # Serialize → bytes
     raw = json.dumps(data).encode()
 
-    # encrypte the bytes
-    encrypted = ciper.encrypt(raw)
+    # Encrypt
+    encrypted = cipher.encrypt(raw)
 
-    # open file and write
-    with open (DATA_FILE, "wb") as f:
+    # Write to disk
+    with open(DATA_FILE, "wb") as f:
         f.write(encrypted)
 
-# ======================================
-# hash the password
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    # Lock down permissions
+    restrict_permission(DATA_FILE)
 
+
+# ======================================================
+# Password hashing
+# ======================================================
+def hash_password(password: str) -> str:
+    """
+    Hashes a password using SHA-256.
+
+    WHY hashing?
+    - Passwords are NEVER stored in plaintext
+    - Even if data is decrypted, passwords are not revealed
+
+    NOTE:
+    - SHA-256 is acceptable for this project
+    - Future upgrade path: bcrypt / argon2
+    """
+    return hashlib.sha256(password.encode()).hexdigest()
