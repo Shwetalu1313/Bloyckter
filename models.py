@@ -9,6 +9,7 @@ class FolderLock:
     wait_time: int
     attempts: int = 0
     locked_until: float = 0.0
+    locked_at: float = 0.0
 
     def is_locked_out(self) -> bool:
         return time.time() < self.locked_until

@@ -25,7 +25,7 @@ def load_key():
         with open(KEY_FILE, "rb") as f:
 
             # read the key
-            key.read()
+            key = f.read()
 
     # finally return the key
     return key
@@ -33,7 +33,7 @@ def load_key():
 # =======================================
 
 # create a ciper object
-def get_ciper():
+def get_cipher():
     return Fernet(load_key())
 
 # ========================================
@@ -45,14 +45,14 @@ def load_data():
         return {}
     
     # ciper object
-    ciper = get_ciper()
+    cipher = get_cipher()
 
     # open and read the file in binary format
     with open(DATA_FILE, "rb") as f:
         encrypted = f.read()
 
     # decrypted the reading in binary format
-    decrypted = ciper.decrypt(encrypted)
+    decrypted = cipher.decrypt(encrypted)
 
     # decode in the json format
     return json.loads(decrypted.decode())
@@ -63,10 +63,10 @@ def load_data():
 def save_data(data):
 
     # ciper object
-    ciper = get_ciper()
+    ciper = get_cipher()
 
     # string to bytes
-    raw = json.dump(data).encode()
+    raw = json.dumps(data).encode()
 
     # encrypte the bytes
     encrypted = ciper.encrypt(raw)

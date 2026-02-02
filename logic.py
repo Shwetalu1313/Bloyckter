@@ -25,7 +25,14 @@ def lock_folder(folder: FolderLock):
     except Exception as e:
         return False, f"Locked Failed: {e}"
     
-    data[folder.path] = folder.__dict__
+    data[folder.path] = {
+    "password_hash": folder.password_hash,
+    "attempts": 0,
+    "locked_until": 0,
+    "locked_at": time.time(),
+    "max_attempts": folder.max_attempts,
+    "wait_time": folder.wait_time
+    }
     save_data(data)
 
     return True, "Folder locked successfully"
@@ -61,14 +68,15 @@ def unlock_folder(folder_path: str, password: str):
     info.attempts += 1
 
     if info.attempts >= info.max_attempts:
-        info.locked_until = time.time() + info.wait_time()
-
+        info.locked_until = time.time() + info.wait_time
         info.attempts = 0
 
     data[folder_path] = info.__dict__
     save_data(data)
 
-    return False, "Wrong Password"
+    remaining = info.max_attempts - info.attempts
+    return False, f"Wrong password. Attempts left: {remaining}"
+
 
 # managed folders
 def get_managed_folders():
