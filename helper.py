@@ -129,13 +129,16 @@ def load_key():
 
         # Protect the key using Windows DPAPI
         # Only this user on this machine can unprotect it
+        # Use DPAPI to protect the key. PyWin32 expects up to 5 args
+        # (data, description, optionalEntropy, promptStruct, flags).
+        # Older code passed an extra reserved parameter which causes
+        # a TypeError on some pywin32 versions.
         protected = win32crypt.CryptProtectData(
-            key,     # raw key bytes
-            None,    # optional description
-            None,    # optional entropy
-            None,    # reserved
-            None,    # prompt structure
-            0        # flags
+            key,
+            None,
+            None,
+            None,
+            0
         )
 
         # Save protected key to disk
@@ -154,9 +157,10 @@ def load_key():
         protected = f.read()
 
     # Unprotect key using Windows DPAPI
+    # Call CryptUnprotectData with the supported arguments list.
+    # The function returns a tuple where index 1 is the unprotected bytes.
     key = win32crypt.CryptUnprotectData(
         protected,
-        None,
         None,
         None,
         None,
