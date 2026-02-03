@@ -21,6 +21,7 @@ import os          # File paths, environment variables
 import json        # Serialize / deserialize data
 import hashlib     # Password hashing (SHA-256)
 import subprocess  # Run Windows commands (icacls)
+import secrets     # Secure random generation
 
 # =========================
 # Third-party libraries
@@ -133,13 +134,31 @@ def load_key():
         # (data, description, optionalEntropy, promptStruct, flags).
         # Older code passed an extra reserved parameter which causes
         # a TypeError on some pywin32 versions.
-        protected = win32crypt.CryptProtectData(
-            key,
-            None,
-            None,
-            None,
-            0
-        )
+        # CryptProtectData signatures vary across pywin32 versions.
+        # Try a few calling conventions for compatibility.
+        try:
+            # Preferred: explicit promptStruct=None, flags=0
+            protected = win32crypt.CryptProtectData(
+                key,
+                None,
+                None,
+                None,
+                None,
+                0,
+            )
+        except TypeError:
+            try:
+                # Fallback: (data, description, optionalEntropy, promptStruct, flags)
+                protected = win32crypt.CryptProtectData(
+                    key,
+                    None,
+                    None,
+                    None,
+                    0,
+                )
+            except TypeError:
+                # Minimal fallback: only data
+                protected = win32crypt.CryptProtectData(key)
 
         # Save protected key to disk
         with open(KEY_FILE, "wb") as f:
@@ -159,13 +178,27 @@ def load_key():
     # Unprotect key using Windows DPAPI
     # Call CryptUnprotectData with the supported arguments list.
     # The function returns a tuple where index 1 is the unprotected bytes.
-    key = win32crypt.CryptUnprotectData(
-        protected,
-        None,
-        None,
-        None,
-        0
-    )[1]
+    # CryptUnprotectData signatures vary; try compatible call patterns.
+    try:
+        key = win32crypt.CryptUnprotectData(
+            protected,
+            None,
+            None,
+            None,
+            None,
+            0,
+        )[1]
+    except TypeError:
+        try:
+            key = win32crypt.CryptUnprotectData(
+                protected,
+                None,
+                None,
+                None,
+                0,
+            )[1]
+        except TypeError:
+            key = win32crypt.CryptUnprotectData(protected)[1]
 
     return key
 
@@ -252,16 +285,30 @@ def save_data(data: dict):
 # ======================================================
 # Password hashing
 # ======================================================
-def hash_password(password: str) -> str:
+def hash_password(password: str, salt: str = None) -> tuple:
     """
-    Hashes a password using SHA-256.
-
-    WHY hashing?
-    - Passwords are NEVER stored in plaintext
-    - Even if data is decrypted, passwords are not revealed
-
-    NOTE:
-    - SHA-256 is acceptable for this project
-    - Future upgrade path: bcrypt / argon2
+    Securely hashes a password using PBKDF2-HMAC-SHA256.
+    
+    Args:
+        password: The plaintext password.
+        salt: Hex string salt. If None, a new 16-byte salt is generated.
+        
+    Returns:
+        tuple: (hex_hash, hex_salt)
     """
-    return hashlib.sha256(password.encode()).hexdigest()
+    if salt is None:
+        # Generate a secure 16-byte salt
+        salt_bytes = secrets.token_bytes(16)
+    else:
+        salt_bytes = bytes.fromhex(salt)
+
+    # PBKDF2 stretching
+    # 100,000 iterations makes brute force significantly slower
+    key = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt_bytes,
+        100000 
+    )
+    
+    return key.hex(), salt_bytes.hex()

@@ -8,15 +8,17 @@ This project focuses on **practical desktop security**, clean architecture, and 
 
 ## ✨ Features
 
-* 🔒 **Multi-Folder Locking:** Secure multiple folders simultaneously.
-* 🔑 **Per-Folder Passwords:** Assign unique credentials to each directory.
-* 🔁 **Brute-Force Protection:** Configurable maximum attempt limits.
-* ⏳ **Timed Lockouts:** Automatic wait periods after failed attempts.
-* 🖥️ **User-Friendly GUI:** Full Tkinter interface (no CLI knowledge required).
-* 🔐 **AES/Fernet Encryption:** Industry-standard encrypted data storage.
-* 🪟 **DPAPI Protection:** Encryption keys are protected by Windows DPAPI.
-* 📁 **AppData Isolation:** Secure storage located in Windows AppData.
-* 🎨 **Visual Feedback:** Real-time lock states with countdowns and color indicators.
+- 🔒 Lock multiple folders
+- 🔑 Unique password **per folder**
+- 🧂 Password hashing with **PBKDF2 + per-folder salt**
+- 🔁 Configurable maximum failed attempts
+- ⏳ Automatic lockout (cooldown) after failed attempts
+- 🔐 Encrypted local storage (AES / Fernet)
+- 🪟 Encryption key protected by **Windows DPAPI**
+- 📁 Secure storage in **Windows AppData**
+- 🖥️ Modern Tkinter GUI
+- 🎨 Visual lockout countdown with color indication
+- 🔑 Change password **without unlocking the folder**
 
 ---
 
@@ -29,28 +31,38 @@ The application follows a tiered architecture to ensure data integrity and secur
 3.  **Encrypted Storage:** AES/Fernet layer for folder metadata.
 4.  **Windows DPAPI:** User and machine-bound key protection.
 
-* Folder metadata is encrypted on disk.
-* The encryption key is **never stored in plaintext**.
-* The key is protected by **Windows itself**.
-* Data is strictly isolated per Windows user.
+- Folder metadata is encrypted at rest
+- Encryption key is **never stored in plaintext**
+- Each folder has its **own password salt**
+- Data is isolated per Windows user
 
 ---
 
 ## 🔐 Security Design
 
-### ✔ What This App Protects Against
-* Casual access by other users.
-* Curious coworkers or housemates.
-* Accidental folder access/modification.
-* Unauthorized copying of metadata to another machine.
+### ✔ What Bloyckter Protects Against
+- Casual access by other local users
+- Curious coworkers
+- Accidental folder access
+- Copying encrypted files to another machine
+- Simple brute-force attacks (rate-limited + PBKDF2)
 
-### ❌ What This App Does NOT Protect Against
-* Windows Administrators (System-level access).
-* Disk removal or offline forensic attacks.
-* Malicious system-level users.
+### ❌ What Bloyckter Does NOT Protect Against
+- Windows Administrators
+- Disk removal / offline forensic attacks
+- Malware running with user privileges
 
 > [!WARNING]  
 > This app is designed for **personal privacy and workflow protection**, not administrator-level or military-grade security.
+
+## 🔑 Password Security
+
+- Passwords are **never stored in plaintext**
+- Each folder uses:
+  - **PBKDF2-HMAC-SHA256**
+  - **100,000 iterations**
+  - **Unique random salt**
+- Changing a password generates a **new salt** automatically
 
 ---
 
@@ -105,10 +117,10 @@ The output `.exe` file will be generated in the `dist/` folder.
 
 ## 🚧 Planned Improvements
 
-- [ ] Change password for existing locked folders.
-- [ ] Dynamic handling of folder path changes.
-- [ ] Windows Explorer integration (right-click to unlock).
-- [ ] Audit logs for failed unlock attempts.
-- [ ] Dark mode UI theme.
-- [ ] System tray minimization.
+- [ ]📜 Audit log for failed unlock attempts
+- [ ]🖱️ Right-click context menu (Explorer integration)
+- [ ]🔔 System tray support
+- [ ]🌙 Dark mode UI
+- [ ]🔐 Password strength indicator
+- [ ]📦 Installer package
 
