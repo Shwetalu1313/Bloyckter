@@ -30,9 +30,6 @@ logs/
 # backup
 backup.*
 
-# gitgnore
-.gitignore
-
 # folder_print
 folder_print.py
 folder_str.txt
