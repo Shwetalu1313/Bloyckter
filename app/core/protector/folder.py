@@ -1,9 +1,9 @@
 import os
 import time
-from helper import load_data, save_data, hash_password
-from models import FolderLock
-
-LOCK_SUFFIX = "_LOCKED"
+from app.core.hashing.pbkdf2 import hash_password
+from app.data.repository import load_data, save_data
+from app.data.models import FolderLock
+from config import LOCK_SUFFIX
 
 def lock_folder(folder: FolderLock):
     """
