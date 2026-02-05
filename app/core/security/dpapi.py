@@ -1,8 +1,8 @@
 import win32crypt                      # Windows DPAPI (key protection)
-import subprocess                      # Run Windows commands (icacls)
 import os                              # File paths
 from cryptography.fernet import Fernet  # Symmetric encryption (AES)
 from config import KEY_FILE
+from app.core.security.security_service import SecurityService # For permission hardening
 
 # ======================================================
 # DPAPI key management
@@ -66,7 +66,7 @@ def load_key():
             f.write(protected)
 
         # Lock down file permissions
-        restrict_permission(KEY_FILE)
+        SecurityService.restrict_permission(KEY_FILE)
         return key
 
     # --------------------------------------------------
@@ -116,30 +116,3 @@ def get_cipher():
     """
     return Fernet(load_key())
 
-
-# ======================================================
-# NTFS permission hardening
-# ======================================================
-def restrict_permission(path: str):
-    """
-    Restrict file permissions so ONLY the current Windows user
-    can access the file.
-
-    This uses the Windows `icacls` command.
-
-    Result:
-    - Removes inherited permissions
-    - Grants Full Control ONLY to current user
-    - Other local users are denied access
-
-    NOTE:
-    - Admin users can still override (this is normal)
-    - This raises the bar significantly for casual attacks
-    """
-
-    subprocess.run(
-        f'icacls "{path}" /inheritance:r /grant:r %username%:F',
-        shell=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
-    )

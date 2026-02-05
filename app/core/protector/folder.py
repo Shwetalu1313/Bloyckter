@@ -32,8 +32,19 @@ class FolderProtector(Protector):
         try:
             # Rename the cover nmae (obfuscation)
             os.rename(folder.path, locked_path)
-            # Apply System and Hidden attributes on Windows
-            os.system(f'attrib +h +s "{locked_path}"')
+
+            if folder.is_invisible:
+                # Apply System and Hidden attributes on Windows
+                os.system(f'attrib +h +s "{locked_path}"')
+                
+            else:
+                # Leave it visible but renamed (Hint Mode)
+                # We still apply +h (Hidden) so it's not immediately obvious,
+                # but NOT +s (System), so "Hidden Items" will reveal it.
+                os.system(f'attrib +h "{locked_path}"')
+
+            SecurityService.hard_restrict_permission(locked_path) # Extra permission hardening for invisible folders
+                
 
         except Exception as e:
             return False, f"Locking failed: {e}"
@@ -61,6 +72,7 @@ class FolderProtector(Protector):
         
         if test_hash == info.password_hash:
             try:
+                SecurityService.restore_hard_permissions(info.locked_path)
                 os.system(f'attrib -h -s "{info.locked_path}"')
                 os.rename(info.locked_path, info.path)
                 del data[target_path]

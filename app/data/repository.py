@@ -3,6 +3,7 @@ from cryptography.fernet import Fernet
 import json
 import app.core.security.dpapi as dpapi
 from config import DATA_FILE
+from app.core.security.security_service import SecurityService # For permission hardening 
 
 # ======================================================
 # Encrypted data loading
@@ -66,4 +67,4 @@ def save_data(data: dict):
         f.write(encrypted)
 
     # Lock down permissions
-    dpapi.restrict_permission(DATA_FILE)
+    SecurityService.restrict_permission(DATA_FILE)

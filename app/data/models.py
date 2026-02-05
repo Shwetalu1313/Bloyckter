@@ -22,6 +22,7 @@ class FolderLock:
     max_attempts: int
     wait_time: int
     cover_name: str
+    is_invisible: bool
     attempts: int = 0
     locked_until: float = 0.0
     locked_at: float = 0.0

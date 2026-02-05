@@ -41,6 +41,16 @@ class LockSettingsDialog(tk.Toplevel):
         self.wait_entry.insert(0, "180")
         self.wait_entry.pack(pady=(0, 20))
 
+        # 5. Checkbox for Invisible Mode (Optional)
+        self.invisible_var = tk.BooleanVar(value=True)
+        invisible_check = tk.Checkbutton(
+            frame, text="Hide from File Explorer", 
+            variable=self.invisible_var,
+            font=("Segoe UI", 9)
+        )
+        self.chk_invisible = invisible_check
+        self.chk_invisible.pack(pady=(0, 10), anchor="w")
+
         # Confirm Button
         btn_lock = tk.Button(
             frame, text="Confirm & Secure", bg="#2ecc71", fg="white",
@@ -63,7 +73,7 @@ class LockSettingsDialog(tk.Toplevel):
                 raise ValueError("A cover name is required for obfuscation.")
             
             # Return all parameters to the main window
-            self.result = (pwd, attempts, wait, cover)
+            self.result = (pwd, attempts, wait, cover, self.invisible_var.get())
             self.destroy()
             
         except ValueError as e:

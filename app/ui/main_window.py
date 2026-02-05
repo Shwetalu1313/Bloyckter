@@ -144,18 +144,19 @@ class FolderLockerApp:
         self.root.wait_window(dialog) # Wait for user to finish
 
         if dialog.result:
-            password, max_attempts, wait_time, cover_name = dialog.result
+            password, max_attempts, wait_time, cover_name, is_invisible = dialog.result
             
             # Hash using the salt-capable helper
             pwd_hash, pwd_salt = hash_password(password)
 
             folder = FolderLock(
-                path=folder_path,
-                password_hash=pwd_hash,
-                password_salt=pwd_salt,
-                max_attempts=max_attempts,
-                wait_time=wait_time,
-                cover_name=cover_name
+                path = folder_path,
+                password_hash = pwd_hash,
+                password_salt = pwd_salt,
+                max_attempts = max_attempts,
+                wait_time = wait_time,
+                cover_name = cover_name,
+                is_invisible = is_invisible
             )
 
             success, msg = FolderProtector().lock(folder)
