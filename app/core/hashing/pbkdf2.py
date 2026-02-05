@@ -1,4 +1,5 @@
 import hashlib     # Password hashing (SHA-256)
+import secrets     # secure random for salt generation
 from config import HASH_ITERATIONS
 
 # ======================================================
