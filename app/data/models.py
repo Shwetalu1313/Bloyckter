@@ -21,6 +21,7 @@ class FolderLock:
     password_salt: str
     max_attempts: int
     wait_time: int
+    cover_name: str
     attempts: int = 0
     locked_until: float = 0.0
     locked_at: float = 0.0

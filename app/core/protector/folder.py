@@ -4,122 +4,97 @@ from app.core.hashing.pbkdf2 import hash_password
 from app.data.repository import load_data, save_data
 from app.data.models import FolderLock
 from config import LOCK_SUFFIX
+from .base import Protector
+from app.core.security.security_service import SecurityService
 
-def lock_folder(folder: FolderLock):
+class FolderProtector(Protector):
     """
-    Renames a folder and records its metadata with a unique salt.
+    Concrete implementation of Protector for local NTFS folders.
+    Implements obfuscation via cover names and Windows attributes.
     """
-    data = load_data()
 
-    if folder.path in data:
-        return False, "Folder already managed."
-    
-    if not os.path.exists(folder.path):
-        return False, "Target folder does not exist."
-    
-    locked_path = folder.path + LOCK_SUFFIX
+    def lock(self, folder: FolderLock) -> tuple[bool, str]:
+        data = load_data()
 
-    try:
-        os.rename(folder.path, locked_path)
-        # Apply System and Hidden attributes on Windows
-        os.system(f'attrib +h +s "{locked_path}"')
-    except Exception as e:
-        return False, f"Locking failed: {e}"
-    
-    # Store the object including the salt
-    folder.locked_path = locked_path
-    folder.locked_at = time.time()
-    data[folder.path] = folder.__dict__
-    
-    save_data(data)
-    return True, "Folder secured successfully."
-
-def unlock_folder(folder_path: str, password: str):
-    """
-    Verifies password using stored salt and restores folder if correct.
-    """
-    data = load_data()
-
-    if folder_path not in data:
-        return False, "Folder not found in vault."
-    
-    info = FolderLock(**data[folder_path])
-
-    if info.is_locked_out():
-        return False, f"Security lockout: Wait {info.remaining_wait()}s."
-    
-    # New Verification: Use the stored salt
-    test_hash, _ = hash_password(password, info.password_salt)
-    
-    if test_hash == info.password_hash:
-        try:
-            os.system(f'attrib -h -s "{info.locked_path}"')
-            os.rename(info.locked_path, info.path)
-            del data[folder_path]
-            save_data(data)
-            return True, "Vault opened!"
-        except Exception as e:
-            return False, f"System error during restoration: {e}"
-    
-    # Handle failed attempt
-    info.attempts += 1
-    if info.attempts >= info.max_attempts:
-        info.locked_until = time.time() + info.wait_time
-        info.attempts = 0
-        msg = f"Locked for {info.wait_time}s due to failed attempts."
-    else:
-        msg = f"Invalid password. {info.max_attempts - info.attempts} tries left."
-    
-    data[folder_path] = info.__dict__
-    save_data(data)
-    return False, msg
-
-# managed folders
-def get_managed_folders():
-    data = load_data()
-    return list(data.keys())
-
-def change_password(folder_path: str, current_password: str, new_password: str):
-    data = load_data()
-    if folder_path not in data:
-        return False, "Folder not managed"
-    
-    info = FolderLock(**data[folder_path])
-
-    if info.is_locked_out():
-        return False, f"Wait {info.remaining_wait()} seconds."
-
-    # FIX: Must use stored salt to verify the current password!
-    test_hash, _ = hash_password(current_password, info.password_salt)
-    
-    if test_hash != info.password_hash:
-        info.attempts += 1
+        if folder.path in data:
+            return False, "Folder already managed."
         
-        #Trigger lockout if max attempts reached
-        if info.attempts >= info.max_attempts:
-            info.locked_until = time.time() + info.wait_time # lockout 
-            info.attempts = 0 # reset attempts
+        if not os.path.exists(folder.path):
+            return False, "Target folder does not exist."
+        
+        # Determine the parent directory and build the obfuscated path
+        parent_dir = os.path.dirname(folder.path)
+        locked_path = os.path.join(parent_dir, folder.cover_name)
 
-            data[folder_path] = info.__dict__ # save changes on object
-            save_data(data)
+        if os.path.exists(locked_path):
+            return False, "Cover name already exists. Choose a different one."
+        
+        try:
+            # Rename the cover nmae (obfuscation)
+            os.rename(folder.path, locked_path)
+            # Apply System and Hidden attributes on Windows
+            os.system(f'attrib +h +s "{locked_path}"')
 
-            return False, (
-            f"Too many wrong attempts.\n"
-            f"Locked for {info.wait_time} seconds."
-            )
-
-        data[folder_path] = info.__dict__
+        except Exception as e:
+            return False, f"Locking failed: {e}"
+        
+        # Update metadata with the new locked path and timestamp
+        folder.locked_path = locked_path
+        folder.locked_at = time.time()
+        data[folder.path] = folder.__dict__
+        
         save_data(data)
-        return False, f"Wrong password. {info.max_attempts - info.attempts} left."
-    
-    # SUCCESS: Generate a FRESH salt for the new password (best practice)
-    new_hash, new_salt = hash_password(new_password)
-    
-    info.password_hash = new_hash
-    info.password_salt = new_salt
-    info.attempts = 0
-    info.locked_until = 0
+        return True, f"Folder secured as '{folder.cover_name}'."
 
-    data[folder_path] = info.__dict__
-    save_data(data)
-    return True, "Password updated with new secure salt."
+
+    def unlock(self, target_path: str, password: str) -> tuple[bool, str]:
+        data = load_data()
+        if target_path not in data:
+            return False, "Folder not found in vault."
+        
+        info = FolderLock(**data[target_path])
+
+        if info.is_locked_out():
+            return False, f"Security lockout: Wait {info.remaining_wait()}s."
+        
+        test_hash, _ = hash_password(password, info.password_salt)
+        
+        if test_hash == info.password_hash:
+            try:
+                os.system(f'attrib -h -s "{info.locked_path}"')
+                os.rename(info.locked_path, info.path)
+                del data[target_path]
+                save_data(data)
+                return True, "Vault opened!"
+            except Exception as e:
+                return False, f"Restoration failed: {e}"
+        
+        # DELEGATION: Let the SecurityService handle the failure
+        return SecurityService.handle_failed_attempt(target_path, info, data)
+
+    def change_password(self, target_path: str, current_pwd: str, new_pwd: str) -> tuple[bool, str]:
+        data = load_data()
+        if target_path not in data:
+            return False, "Folder not managed"
+        
+        info = FolderLock(**data[target_path])
+
+        if info.is_locked_out():
+            return False, f"Wait {info.remaining_wait()} seconds."
+
+        test_hash, _ = hash_password(current_pwd, info.password_salt)
+        
+        if test_hash != info.password_hash:
+            # DELEGATION: Use the same security rules for password changes
+            return SecurityService.handle_failed_attempt(target_path, info, data)
+        
+        # Success logic...
+        new_hash, new_salt = hash_password(new_pwd)
+        info.password_hash = new_hash
+        info.password_salt = new_salt
+        info.attempts = 0
+        info.locked_until = 0
+
+        data[target_path] = info.__dict__
+        save_data(data)
+        return True, "Password updated successfully."

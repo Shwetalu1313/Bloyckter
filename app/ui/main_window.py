@@ -4,9 +4,9 @@ from tkinter import ttk
 import time
 from app.core.hashing.pbkdf2 import hash_password
 from app.data.repository import load_data, save_data
-from app.core.protector.folder import lock_folder, unlock_folder, change_password
+from app.core.protector.folder import FolderProtector
 from app.data.models import FolderLock
-import app.ui.dialogs.lock_dialogs as lock_dialogs
+from app.ui.dialogs.lock_dialogs import LockSettingsDialog
 
 class FolderLockerApp:
     def __init__(self, root):
@@ -140,11 +140,11 @@ class FolderLockerApp:
         if not folder_path: return
 
         # Launch our new custom form
-        dialog = lock_dialogs.LockSettingsDialog(self.root)
+        dialog = LockSettingsDialog(self.root)
         self.root.wait_window(dialog) # Wait for user to finish
 
         if dialog.result:
-            password, max_attempts, wait_time = dialog.result
+            password, max_attempts, wait_time, cover_name = dialog.result
             
             # Hash using the salt-capable helper
             pwd_hash, pwd_salt = hash_password(password)
@@ -154,10 +154,11 @@ class FolderLockerApp:
                 password_hash=pwd_hash,
                 password_salt=pwd_salt,
                 max_attempts=max_attempts,
-                wait_time=wait_time
+                wait_time=wait_time,
+                cover_name=cover_name
             )
 
-            success, msg = lock_folder(folder)
+            success, msg = FolderProtector().lock(folder)
             if success:
                 messagebox.showinfo("Success", "Folder secured with custom rules.")
                 self.refresh_table()
@@ -174,7 +175,7 @@ class FolderLockerApp:
         password = simpledialog.askstring("Vault Access", "Enter password to unlock:", show="*")
         if not password: return
 
-        success, msg = unlock_folder(folder_path, password)
+        success, msg = FolderProtector().unlock(folder_path, password)
         if success:
             messagebox.showinfo("Unlocked", "Folder is now accessible.")
             self.refresh_table()
@@ -199,7 +200,7 @@ class FolderLockerApp:
         new_e = tk.Entry(dialog, show="*", width=25); new_e.pack()
 
         def submit():
-            success, msg = change_password(folder_path, curr_e.get(), new_e.get())
+            success, msg = FolderProtector().change_password(folder_path, curr_e.get(), new_e.get())
             if success:
                 messagebox.showinfo("Success", "Password updated.")
                 dialog.destroy()
