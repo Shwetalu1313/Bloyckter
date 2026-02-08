@@ -92,8 +92,8 @@ Note: `main.py` launches the packaged app (`app/`) and ensures imports resolve c
 ---
 
 ## Comming Features
-- [  ] app settings where user can configure itself
-- [  ] After Unlocking the folder, folder is coming back with the cover_name. it should come with original name.
-- [  ] blyock is only clickable one time. after one time, terminal is showing very quickly and fired.
-- [  ] we need to combine with original timer and attempt function to the blyock file extension.
+- [ ] app settings where user can configure itself
+- [ ] After Unlocking the folder, folder is coming back with the cover_name. it should come with original name.
+- [ ] blyock is only clickable one time. after one time, terminal is showing very quickly and fired.
+- [ ] we need to combine with original timer and attempt function to the blyock file extension.
 
