@@ -74,7 +74,7 @@ class FolderLockerApp:
 
     def _setup_treeview(self):
         """Initializes the data table with a scrollbar."""
-        columns = ("no", "path", "status", "locked_at")
+        columns = ("no", "path", "cover", "status", "locked_at")
         
         # Container for Tree + Scrollbar
         tree_scroll_frame = tk.Frame(self.right_panel)
@@ -87,11 +87,13 @@ class FolderLockerApp:
 
         self.tree.heading("no", text="#")
         self.tree.heading("path", text="Directory Path")
+        self.tree.heading("cover", text="Cover Name")
         self.tree.heading("status", text="Security Status")
         self.tree.heading("locked_at", text="Date Secured")
 
         self.tree.column("no", width=30, anchor="center")
         self.tree.column("path", width=300)
+        self.tree.column("cover", width=140, anchor="center")
         self.tree.column("status", width=120, anchor="center")
         self.tree.column("locked_at", width=100, anchor="center")
 
@@ -109,9 +111,10 @@ class FolderLockerApp:
 
         for idx, (path, info) in enumerate(data.items(), start=1):
             locked_date = time.strftime("%Y-%m-%d", time.localtime(info["locked_at"]))
+            cover_name = info.get("cover_name") or info.get("cover") or ""
             self.tree.insert(
                 "", "end", iid=path,
-                values=(idx, path, "Secured", locked_date),
+                values=(idx, path, cover_name, "Secured", locked_date),
                 tags=("normal",)
             )
 
@@ -130,7 +133,8 @@ class FolderLockerApp:
                 status, tag = "Secured", "normal"
 
             current_values = list(self.tree.item(path, "values"))
-            current_values[2] = status
+            # values layout: (idx, path, cover, status, locked_at)
+            current_values[3] = status
             self.tree.item(path, values=current_values, tags=(tag,))
         
         self.root.after(1000, self.update_time_column)
