@@ -96,4 +96,5 @@ Note: `main.py` launches the packaged app (`app/`) and ensures imports resolve c
 - [ ] After Unlocking the folder, folder is coming back with the cover_name. it should come with original name.
 - [ ] blyock is only clickable one time. after one time, terminal is showing very quickly and fired.
 - [ ] we need to combine with original timer and attempt function to the blyock file extension.
+- [ ] Need to fix - value metadata not found error is occuring when user input the passowrd even the password is correct or not
 
