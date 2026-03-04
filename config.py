@@ -17,4 +17,7 @@ def get_app_data_dir():
 
 APP_DATA_DIR = get_app_data_dir()
 DATA_FILE = os.path.join(APP_DATA_DIR, "data.enc")
+DATA_FILE_BACKUP = os.path.join(APP_DATA_DIR, "data.enc.bak")
 KEY_FILE = os.path.join(APP_DATA_DIR, "key.blob")
+SETTINGS_FILE = os.path.join(APP_DATA_DIR, "settings.json")
+AUDIT_LOG_FILE = os.path.join(APP_DATA_DIR, "audit.log")

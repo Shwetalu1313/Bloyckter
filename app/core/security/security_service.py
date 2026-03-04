@@ -1,5 +1,6 @@
 import time
 import subprocess                      # Run Windows commands (icacls)
+import os
 
 class SecurityService:
     """
@@ -58,8 +59,9 @@ class SecurityService:
         - This raises the bar significantly for casual attacks
         """
 
+        username = os.environ.get("USERNAME", "%username%")
         subprocess.run(
-            f'icacls "{path}" /inheritance:r /grant:r %username%:F',
+            f'icacls "{path}" /inheritance:r /grant:r "{username}:F"',
             shell=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
@@ -92,7 +94,16 @@ class SecurityService:
         """
 
         # NEW: Restore permissions before trying to rename
+        username = os.environ.get("USERNAME", "%username%")
         subprocess.run(
-            f'icacls "{path}" /grant *S-1-1-0:(OI)(CI)(F)', 
-            shell=True, stdout=subprocess.DEVNULL
+            f'icacls "{path}" /remove:d *S-1-1-0',
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        subprocess.run(
+            f'icacls "{path}" /grant:r "{username}:F"',
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )

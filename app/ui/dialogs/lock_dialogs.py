@@ -69,8 +69,14 @@ class LockSettingsDialog(tk.Toplevel):
             
             if not pwd: 
                 raise ValueError("Password is required.")
+            if len(pwd) < 8:
+                raise ValueError("Password must be at least 8 characters.")
             if not cover: 
                 raise ValueError("A cover name is required for obfuscation.")
+            if attempts < 1 or attempts > 10:
+                raise ValueError("Max attempts must be between 1 and 10.")
+            if wait < 15 or wait > 86400:
+                raise ValueError("Lockout duration must be between 15 and 86400 seconds.")
             
             # Return all parameters to the main window
             self.result = (pwd, attempts, wait, cover, self.invisible_var.get())

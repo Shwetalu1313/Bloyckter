@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
 from app.data.repository import load_data
-from app.core.protector.folder import FolderProtector
 from app.services.extraction_service import ExtractionService
+from app.services.audit_service import AuditService
 
 class QuickUnlockDialog:
     def __init__(self, root, target_file_path):
@@ -44,6 +44,7 @@ class QuickUnlockDialog:
                 break
 
         if not original_path:
+            AuditService.record_error("QUICK_UNLOCK_FAILED", f"locked_path={self.target_file_path} reason=metadata_missing")
             messagebox.showerror("Error", "Vault metadata not found.")
             self.root.destroy()
             return
@@ -56,6 +57,7 @@ class QuickUnlockDialog:
         lock_model = FolderLock(**target_info)
         
         if lock_model.is_locked_out():
+            AuditService.record_error("QUICK_UNLOCK_DENIED", f"path={original_path} reason=locked_out")
             messagebox.showerror("Security", f"Locked out! Wait {lock_model.remaining_wait()}s.")
             return
 
@@ -66,12 +68,15 @@ class QuickUnlockDialog:
             # ONLY call extraction if password is correct
             success, msg = ExtractionService.decrypt_and_open(self.target_file_path)
             if success:
+                AuditService.record("QUICK_UNLOCK_OK", f"path={original_path}")
                 messagebox.showinfo("Success", "Vault opened in temporary view!")
                 self.root.destroy()
             else:
+                AuditService.record_error("QUICK_UNLOCK_FAILED", f"path={original_path} reason={msg}")
                 messagebox.showerror("Error", msg)
         else:
             # Handle failed attempt (this will update attempts/lockout)
             from app.core.security.security_service import SecurityService
             _, fail_msg = SecurityService.handle_failed_attempt(original_path, lock_model, data)
+            AuditService.record_error("QUICK_UNLOCK_DENIED", f"path={original_path} reason=invalid_password")
             messagebox.showerror("Access Denied", fail_msg)

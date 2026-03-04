@@ -1,13 +1,12 @@
 import os
 import time
-import shutil
 from app.core.hashing.pbkdf2 import hash_password
 from app.data.repository import load_data, save_data
 from app.data.models import FolderLock
-from config import LOCK_SUFFIX
 from .base import Protector
 from app.core.security.security_service import SecurityService
-from .archive import ArchiveProtector   
+from .archive import ArchiveProtector
+from app.services.audit_service import AuditService
 
 class FolderProtector(Protector):
     """
@@ -62,6 +61,7 @@ class FolderProtector(Protector):
         folder.locked_at = time.time()
         data[folder.path] = folder.__dict__
         save_data(data)
+        AuditService.record("FOLDER_LOCKED", f"path={folder.path} locked_path={folder.locked_path}")
         
         return True, f"Folder secured as '{folder.cover_name}.bloyck'."
 
@@ -85,8 +85,16 @@ class FolderProtector(Protector):
                 # Check for the correct extension (.bloyck, not .zip)
                 if info.locked_path.lower().endswith('.bloyck'):
                     # Call the specialized decryptor
-                    success, msg = ArchiveProtector().unlock(info.locked_path, password)
+                    success, msg = ArchiveProtector().unlock(
+                        info.locked_path,
+                        password,
+                        original_path=info.path,
+                    )
                     if not success:
+                        AuditService.record_error(
+                            "FOLDER_UNLOCK_FAILED",
+                            f"path={target_path} reason={msg}",
+                        )
                         return False, msg
                 else:
                     # Handle normal obfuscated folders
@@ -95,8 +103,10 @@ class FolderProtector(Protector):
 
                 del data[target_path]
                 save_data(data)
+                AuditService.record("FOLDER_UNLOCKED", f"path={target_path}")
                 return True, "Vault opened!"
             except Exception as e:
+                AuditService.record_error("FOLDER_UNLOCK_FAILED", f"path={target_path} error={e}")
                 return False, f"Restoration failed: {e}"
         
         # DELEGATION: Let the SecurityService handle the failure
@@ -127,4 +137,5 @@ class FolderProtector(Protector):
 
         data[target_path] = info.__dict__
         save_data(data)
+        AuditService.record("PASSWORD_CHANGED", f"path={target_path}")
         return True, "Password updated successfully."

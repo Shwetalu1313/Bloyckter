@@ -1,100 +1,91 @@
-# 🔐 Bloyckter — Python Folder Locker (GUI)
+# Bloyckter - Secure Folder Vault + Workstation Lock
 
-Bloyckter is a Windows desktop application (Tkinter) that secures folders with per-folder passwords, configurable attempt limits, and timed lockouts. It stores folder metadata encrypted with AES (Fernet) and protects the encryption key using Windows DPAPI.
+Bloyckter is a Windows desktop security utility built with Tkinter.
+It provides:
 
-This README has been updated to reflect recent refactoring and enhancements: package layout, DPAPI-protected key handling, PBKDF2-based password hashing with per-folder salt, and a security service that centralizes lockout logic.
+- Encrypted folder vaulting (`.bloyck` containers)
+- Per-folder password protection with lockout rules
+- Workstation lock utility (manual lock + idle auto-lock)
 
----
+## Core Security Model
 
-## ✨ Key Features (Updated)
+- Folder metadata is encrypted in `%LOCALAPPDATA%\Bloyckter\data.enc`.
+- Encryption keys are protected with Windows DPAPI (`key.blob`).
+- Passwords are hashed with PBKDF2-HMAC-SHA256 + per-folder salt.
+- Lockout policy is enforced per vault item (`max_attempts`, `wait_time`).
 
-- 🔒 Lock multiple folders
-- 🕶 Cover-name obfuscation: folders are renamed to a generated cover name (hidden + system attributes) for extra obscurity
-- 🔑 Unique password per folder with PBKDF2-HMAC-SHA256 and per-folder salt
-- 🔁 Configurable maximum failed attempts and automated cooldown/lockout handling
-- 🛡 SecurityService: central handling of failed attempts, lockout timers, and state persistence
-- 🔐 Encrypted local storage (`data.enc`) with AES/Fernet
-- 🪟 DPAPI-protected key (`key.blob`) bound to the current Windows user and machine
-- 🗂 App packaged under `app/` with clear separation: `ui`, `core`, `data` modules
-- 🖥️ Tkinter GUI with visual countdown and color indicators for lockout state
-- 🔑 Change password without unlocking (supported)
+## New Market-Ready Improvements
 
----
+- Atomic encrypted data writes with backup fallback (`data.enc.bak`)
+- Audit logging with log rotation (`audit.log`)
+- Safer input validation in security dialogs
+- Reliable restore-to-original-folder path when unlocking archives
+- Isolated temporary extraction directories for quick-view unlocks
+- Persistent workstation auto-lock settings (`settings.json`)
 
-## Project Layout (high-level)
+## Project Structure
 
-- `main.py` — Application entry point
-- `app/ui/` — GUI components and windows
-- `app/core/` — Core logic (protector implementations, hashing, security)
-- `app/data/` — Encrypted repository, data models, persistence helpers
-- `helper.py` — Low-level helpers used by legacy modules (kept for compatibility)
-
----
-
-## How It Works (concise)
-
-- The GUI delegates operations to `FolderProtector` implementations in `app.core.protector`.
-- Passwords are hashed with PBKDF2 using a unique salt per folder.
-- Metadata is serialized and encrypted with Fernet; the key is stored protected by DPAPI so it can only be unprotected by the same Windows user on the same machine.
-- `SecurityService` manages failed attempt counting and sets `locked_until` timestamps; the GUI shows remaining wait time when applicable.
-
----
+- `main.py` - app entrypoint + CLI flags
+- `app/ui/` - main GUI + dialogs
+- `app/core/` - hashing, security, vault protection
+- `app/data/` - encrypted data and settings repositories
+- `app/services/` - OS integrations (registry, extraction, audit, workstation lock)
 
 ## Requirements
 
 - Windows 10/11
 - Python 3.10+
-- Packages (see `requirements.txt`): `cryptography`, `pywin32`, `tk` (part of standard lib)
+- Packages in `requirements.txt`:
+  - `cryptography`
+  - `pywin32`
 
-Install dependencies in the project virtualenv:
+Install:
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
----
-
-## Run the App
-
-From project root with your venv activated:
+## Run
 
 ```powershell
 python main.py
 ```
 
-Note: `main.py` launches the packaged app (`app/`) and ensures imports resolve correctly.
+## Workstation Lock Utility
 
----
+From the GUI:
 
-## Recovering / Manually Unlocking Folders
+- Click `Lock Session Now` to lock Windows immediately.
+- Enable `Idle auto-lock`, set idle minutes, and apply settings.
 
-- Bloyckter stores metadata in `%LOCALAPPDATA%\Bloyckter` as `data.enc` and the DPAPI-protected key as `key.blob`.
-- If you still have the original password, use the app's Unlock flow. If the app cannot unlock (metadata missing/corrupt) you can manually remove the Hidden/System attributes and rename the folder back to its original name (see the `attrib` and `rename` commands). Always back up `data.enc` and `key.blob` before attempting recovery.
+From CLI:
 
----
+```powershell
+python main.py --lock-workstation
+```
 
-## Notes & Limitations
+## Quick Unlock Flow
 
-- DPAPI binds the key to the Windows user and machine — copying `key.blob` to another machine or user will prevent decryption.
-- Administrators can still access files if they have sufficient privileges.
-- Deleting `data.enc` or `key.blob` results in permanent loss of metadata (locked folders cannot be restored by the app without them).
+`.bloyck` files can be opened with:
 
----
+```powershell
+python main.py --unlock "C:\path\to\vault.bloyck"
+```
 
-## Recent Enhancements
+If file association registration is available, double-clicking `.bloyck` files opens the quick unlock dialog.
 
-- Refactored to `app/` package with modular `core`, `ui`, and `data` layers.
-- Added `FolderProtector` abstraction and cover-name obfuscation.
-- Centralized security rules in `SecurityService` for consistent lockout behavior.
-- Improved PBKDF2 hashing and salt handling.
-- Robust DPAPI handling with compatibility fixes for different `pywin32` versions.
+## Important Limitations
 
----
+- DPAPI ties vault decryption to the current Windows user and machine.
+- Administrators with sufficient privileges can still access raw disk data.
+- Losing both `data.enc` and `key.blob` means vault metadata cannot be recovered.
 
-## Comming Features
-- [ ] app settings where user can configure itself
-- [ ] After Unlocking the folder, folder is coming back with the cover_name. it should come with original name.
-- [ ] blyock is only clickable one time. after one time, terminal is showing very quickly and fired.
-- [ ] we need to combine with original timer and attempt function to the blyock file extension.
-- [ ] Need to fix - value metadata not found error is occuring when user input the passowrd even the password is correct or not
+## Local Data Paths
 
+Stored under `%LOCALAPPDATA%\Bloyckter`:
+
+- `data.enc` - encrypted vault metadata
+- `data.enc.bak` - backup of prior metadata
+- `key.blob` - DPAPI-protected encryption key
+- `settings.json` - workstation lock preferences
+- `audit.log` - security event log

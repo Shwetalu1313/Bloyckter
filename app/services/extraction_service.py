@@ -2,7 +2,9 @@ import os
 import io
 import zipfile
 import subprocess
+import tempfile
 from app.core.security.dpapi import get_cipher
+from app.services.audit_service import AuditService
 
 class ExtractionService:
     """
@@ -23,16 +25,17 @@ class ExtractionService:
             # Decrypt the AES container
             decrypted_zip = cipher.decrypt(encrypted_content)
             
-            # Extract to a temp location
-            temp_dir = os.path.join(os.environ['TEMP'], "Bloyckter_Temp")
-            os.makedirs(temp_dir, exist_ok=True)
+            # Extract to an isolated temp location to avoid collisions.
+            temp_dir = tempfile.mkdtemp(prefix="Bloyckter_Temp_")
             
             with zipfile.ZipFile(io.BytesIO(decrypted_zip)) as zf:
                 zf.extractall(temp_dir)
             
             # Open the folder for the user
             subprocess.run(f'explorer "{temp_dir}"')
+            AuditService.record("TEMP_VIEW_OPENED", f"vault={vault_path} temp={temp_dir}")
             
             return True, "Vault opened in temporary view."
         except Exception as e:
+            AuditService.record_error("TEMP_VIEW_FAILED", f"vault={vault_path} error={e}")
             return False, f"Decryption failed: {str(e)}"
