@@ -6,6 +6,7 @@ It provides:
 - Encrypted folder vaulting (`.bloyck` containers)
 - Per-folder password protection with lockout rules
 - Workstation lock utility (manual lock + idle auto-lock)
+- Remote mount locking support (Windows UNC/mapped drives + NFS/SMB mount points)
 
 ## Core Security Model
 
@@ -57,6 +58,7 @@ From the GUI:
 
 - Click `Lock Session Now` to lock Windows immediately.
 - Enable `Idle auto-lock`, set idle minutes, and apply settings.
+- Use `Mini Console Portal` to open a popup console for remote checks and command-driven locking.
 
 From CLI:
 
@@ -73,6 +75,20 @@ python main.py --unlock "C:\path\to\vault.bloyck"
 ```
 
 If file association registration is available, double-clicking `.bloyck` files opens the quick unlock dialog.
+
+## Mini Console Commands
+
+Open the popup via the sidebar button `Open Console Portal`:
+
+- `help`
+- `test <path>`
+- `lock <path> --password <pwd> [--cover <name>] [--attempts <1-10>] [--wait <15-86400>] [--visible]`
+
+Example:
+
+```powershell
+lock "\\nas01\finance-share" --password "StrongPass123!" --cover "PrinterDriverCache"
+```
 
 ## Important Limitations
 

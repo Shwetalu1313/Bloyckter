@@ -2,9 +2,9 @@ import io
 import shutil
 import zipfile
 import os
+from typing import Optional
 from .base import Protector
 from app.core.security.dpapi import get_cipher
-from app.core.hashing.pbkdf2 import hash_password
 
 class ArchiveProtector(Protector):
     """
@@ -12,10 +12,30 @@ class ArchiveProtector(Protector):
     Prevents Administrators from reading files via cryptographic lockdown.
     """
 
-    def lock(self, folder_lock_model) -> tuple[bool, str]:
+    def _clear_directory_contents(self, root_path: str, skip_paths: Optional[set[str]] = None) -> None:
+        normalized_skip = set()
+        if skip_paths:
+            normalized_skip = {os.path.abspath(item) for item in skip_paths}
+
+        for entry in os.scandir(root_path):
+            target = os.path.abspath(entry.path)
+            if target in normalized_skip:
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                shutil.rmtree(target)
+            else:
+                os.remove(target)
+
+    def lock(
+        self,
+        folder_lock_model,
+        target_vault: Optional[str] = None,
+        preserve_source_root: bool = False,
+    ) -> tuple[bool, str]:
         path = folder_lock_model.path
         parent_dir = os.path.dirname(path)
-        target_vault = os.path.join(parent_dir, f"{folder_lock_model.cover_name}.bloyck")
+        if not target_vault:
+            target_vault = os.path.join(parent_dir, f"{folder_lock_model.cover_name}.bloyck")
 
         try:
             buffer = io.BytesIO()
@@ -32,7 +52,11 @@ class ArchiveProtector(Protector):
             with open(target_vault, 'wb') as f:
                 f.write(encrypted_data)
 
-            shutil.rmtree(path)
+            if preserve_source_root:
+                self._clear_directory_contents(path, skip_paths={target_vault})
+            else:
+                shutil.rmtree(path)
+
             folder_lock_model.locked_path = target_vault
             return True, "Folder locked successfully"
         except Exception as e:

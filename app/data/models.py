@@ -27,6 +27,7 @@ class FolderLock:
     locked_until: float = 0.0
     locked_at: float = 0.0
     locked_path: str = ""
+    is_remote_mount: bool = False
 
     def is_locked_out(self) -> bool:
         """Returns True if the folder is currently in a cooldown state."""

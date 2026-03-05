@@ -1,86 +1,159 @@
 import tkinter as tk
 from tkinter import messagebox
 
+
 class LockSettingsDialog(tk.Toplevel):
     """
-    Custom popup to collect all locking parameters at once, 
-    including the new Cover Name for obfuscation.
+    Modal dialog for lock parameters:
+    password, cover name, max attempts, wait time, and visibility mode.
     """
+
+    COLORS = {
+        "bg": "#F2F6FA",
+        "card": "#FFFFFF",
+        "border": "#D6E0EA",
+        "text": "#1E2935",
+        "muted": "#5D6D7E",
+        "primary": "#0F766E",
+        "neutral": "#E6ECF2",
+    }
+
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Security Settings")
-        self.geometry("340x320")
+        self.geometry("470x470")
         self.resizable(False, False)
+        self.configure(bg=self.COLORS["bg"])
         self.result = None
-        self.grab_set()  # Make dialog modal
+        self.grab_set()
 
-        # Main layout frame
-        frame = tk.Frame(self, padx=20, pady=20)
-        frame.pack(fill="both", expand=True)
+        card = tk.Frame(
+            self,
+            bg=self.COLORS["card"],
+            highlightbackground=self.COLORS["border"],
+            highlightthickness=1,
+            padx=18,
+            pady=16,
+        )
+        card.pack(fill="both", expand=True, padx=16, pady=16)
 
-        # 1. Password Field
-        tk.Label(frame, text="Set Vault Password:").pack(anchor="w")
-        self.pwd_entry = tk.Entry(frame, show="*", width=35)
-        self.pwd_entry.pack(pady=(0, 10))
+        tk.Label(
+            card,
+            text="Secure Folder",
+            bg=self.COLORS["card"],
+            fg=self.COLORS["text"],
+            font=("Segoe UI Semibold", 14),
+        ).pack(anchor="w")
 
-        # 2. NEW: Cover Name (Obfuscation Alias)
-        tk.Label(frame, text="Cover Name (File Explorer Alias):").pack(anchor="w")
-        self.cover_entry = tk.Entry(frame, width=35)
-        self.cover_entry.insert(0, "System_Data_Cache") # Default fake name
-        self.cover_entry.pack(pady=(0, 10))
+        tk.Label(
+            card,
+            text="Set lock policy and disguise details before securing the folder.",
+            bg=self.COLORS["card"],
+            fg=self.COLORS["muted"],
+            font=("Segoe UI", 9),
+        ).pack(anchor="w", pady=(2, 14))
 
-        # 3. Max Attempts
-        tk.Label(frame, text="Max Failed Attempts:").pack(anchor="w")
-        self.attempts_entry = tk.Entry(frame, width=35)
+        tk.Label(card, text="Vault Password", bg=self.COLORS["card"], fg=self.COLORS["text"], font=("Segoe UI", 9)).pack(anchor="w")
+        self.pwd_entry = tk.Entry(card, show="*", width=38, font=("Segoe UI", 10))
+        self.pwd_entry.pack(fill="x", pady=(2, 10))
+
+        tk.Label(card, text="Cover Name (Alias)", bg=self.COLORS["card"], fg=self.COLORS["text"], font=("Segoe UI", 9)).pack(anchor="w")
+        self.cover_entry = tk.Entry(card, width=38, font=("Segoe UI", 10))
+        self.cover_entry.insert(0, "System_Data_Cache")
+        self.cover_entry.pack(fill="x", pady=(2, 10))
+
+        row = tk.Frame(card, bg=self.COLORS["card"])
+        row.pack(fill="x", pady=(0, 10))
+
+        left = tk.Frame(row, bg=self.COLORS["card"])
+        left.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        tk.Label(left, text="Max Failed Attempts", bg=self.COLORS["card"], fg=self.COLORS["text"], font=("Segoe UI", 9)).pack(anchor="w")
+        self.attempts_entry = tk.Spinbox(left, from_=1, to=10, width=10, font=("Segoe UI", 10))
+        self.attempts_entry.delete(0, "end")
         self.attempts_entry.insert(0, "3")
-        self.attempts_entry.pack(pady=(0, 10))
+        self.attempts_entry.pack(fill="x", pady=(2, 0))
 
-        # 4. Wait Time
-        tk.Label(frame, text="Lockout Duration (seconds):").pack(anchor="w")
-        self.wait_entry = tk.Entry(frame, width=35)
+        right = tk.Frame(row, bg=self.COLORS["card"])
+        right.pack(side="right", fill="x", expand=True, padx=(8, 0))
+        tk.Label(right, text="Lockout Duration (sec)", bg=self.COLORS["card"], fg=self.COLORS["text"], font=("Segoe UI", 9)).pack(anchor="w")
+        self.wait_entry = tk.Spinbox(right, from_=15, to=86400, width=10, font=("Segoe UI", 10))
+        self.wait_entry.delete(0, "end")
         self.wait_entry.insert(0, "180")
-        self.wait_entry.pack(pady=(0, 20))
+        self.wait_entry.pack(fill="x", pady=(2, 0))
 
-        # 5. Checkbox for Invisible Mode (Optional)
         self.invisible_var = tk.BooleanVar(value=True)
-        invisible_check = tk.Checkbutton(
-            frame, text="Hide from File Explorer", 
+        tk.Checkbutton(
+            card,
+            text="Hide from File Explorer after lock",
             variable=self.invisible_var,
-            font=("Segoe UI", 9)
-        )
-        self.chk_invisible = invisible_check
-        self.chk_invisible.pack(pady=(0, 10), anchor="w")
+            bg=self.COLORS["card"],
+            fg=self.COLORS["text"],
+            activebackground=self.COLORS["card"],
+            activeforeground=self.COLORS["text"],
+            selectcolor=self.COLORS["card"],
+            font=("Segoe UI", 9),
+        ).pack(anchor="w", pady=(6, 16))
 
-        # Confirm Button
-        btn_lock = tk.Button(
-            frame, text="Confirm & Secure", bg="#2ecc71", fg="white",
-            font=("Segoe UI", 9, "bold"), command=self.on_confirm,
-            relief="flat", cursor="hand2", height=2
-        )
-        btn_lock.pack(fill="x")
+        actions = tk.Frame(card, bg=self.COLORS["card"])
+        actions.pack(fill="x")
+
+        tk.Button(
+            actions,
+            text="Cancel",
+            command=self.destroy,
+            bg=self.COLORS["neutral"],
+            fg=self.COLORS["text"],
+            activebackground=self.COLORS["neutral"],
+            activeforeground=self.COLORS["text"],
+            font=("Segoe UI Semibold", 9),
+            relief="flat",
+            cursor="hand2",
+            padx=10,
+            pady=6,
+            bd=0,
+        ).pack(side="left")
+
+        tk.Button(
+            actions,
+            text="Confirm and Secure",
+            bg=self.COLORS["primary"],
+            fg="white",
+            activebackground=self.COLORS["primary"],
+            activeforeground="white",
+            font=("Segoe UI Semibold", 9),
+            command=self.on_confirm,
+            relief="flat",
+            cursor="hand2",
+            padx=14,
+            pady=6,
+            bd=0,
+        ).pack(side="right")
+
+        self.pwd_entry.focus_set()
+        self.bind("<Return>", lambda _evt: self.on_confirm())
+        self.bind("<Escape>", lambda _evt: self.destroy())
 
     def on_confirm(self):
         pwd = self.pwd_entry.get()
         cover = self.cover_entry.get().strip()
-        
+
         try:
             attempts = int(self.attempts_entry.get())
             wait = int(self.wait_entry.get())
-            
-            if not pwd: 
+
+            if not pwd:
                 raise ValueError("Password is required.")
             if len(pwd) < 8:
                 raise ValueError("Password must be at least 8 characters.")
-            if not cover: 
+            if not cover:
                 raise ValueError("A cover name is required for obfuscation.")
             if attempts < 1 or attempts > 10:
                 raise ValueError("Max attempts must be between 1 and 10.")
             if wait < 15 or wait > 86400:
                 raise ValueError("Lockout duration must be between 15 and 86400 seconds.")
-            
-            # Return all parameters to the main window
+
             self.result = (pwd, attempts, wait, cover, self.invisible_var.get())
             self.destroy()
-            
-        except ValueError as e:
-            messagebox.showerror("Invalid Input", str(e))
+
+        except ValueError as ex:
+            messagebox.showerror("Invalid Input", str(ex))
